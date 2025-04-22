@@ -78,21 +78,25 @@ namespace DataCollectorTest
             this.entityId = grid.EntityId;
             this.name = grid.DisplayName;
             this.ownerId = grid.BigOwners?.FirstOrDefault() ?? 0L;
-            this.last_position = new Vector3();
             this.position = grid.PositionComp.GetPosition();
-            
+            this.last_position = this.position;
+
 
             IMyFaction faction = MyAPIGateway.Session.Factions.TryGetPlayerFaction(ownerId);
             factionTag = faction.Tag ?? "Unknown";
         }
 
-        public bool HasMoved() => !position.Equals(last_position);
+        public bool HasMoved()
+        {
+            this.updatePosition();
+            return !position.Equals(last_position);
+        }
 
         public string GridToJson()
         {
             var gridData = new GridData
             {
-                uuid = $"{this.entityId}_{this.ownerId}_{Escape(this.name)}",
+                uuid = $"{this.ownerId}_{Escape(this.name)}",
                 entity_id = this.entityId,
                 grid_name = this.name,
                 owner_id = this.ownerId,
@@ -104,10 +108,9 @@ namespace DataCollectorTest
 
         public string PositionToJson()
         {
-            this.updatePosition();
             var positionData = new PositionData()
             {
-                grid_uuid = $"{this.entityId}_{this.ownerId}_{Escape(this.name)}",
+                grid_uuid = $"{this.ownerId}_{Escape(this.name)}",
                 x = this.position.X,
                 y = this.position.Y,
                 z = this.position.Z
@@ -148,8 +151,12 @@ namespace DataCollectorTest
             {
                 if (entity?.MarkedForClose != false) continue;
                 
-                if (entity is MyCubeGrid grid && !grid.IsStatic && grid.Physics != null)
+                if (entity is MyCubeGrid grid && grid.Physics != null && !grid.IsPreview)
                 {
+                    var group = MyCubeGridGroups.Static.Physical.GetGroup(grid);
+                    if (group != null && group.Nodes.FirstOrDefault()?.NodeData != grid)
+                        continue;
+
                     MyGridInRange detectedGrid = new MyGridInRange(grid);
                     newGridsInRange.Add(detectedGrid.entityId, detectedGrid);
                 }
