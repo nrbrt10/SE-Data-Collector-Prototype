@@ -70,6 +70,7 @@ namespace DataCollectorTest
         private string factionTag;
         private Vector3 position { get; set; }
         private Vector3 last_position {  get; set; }
+        private bool isStatic { get; set; }
         public bool isPosted {  get; set; }
 
         public MyGridInRange (MyCubeGrid grid)
@@ -151,7 +152,7 @@ namespace DataCollectorTest
             {
                 if (entity?.MarkedForClose != false) continue;
                 
-                if (entity is MyCubeGrid grid && grid.Physics != null && !grid.IsPreview)
+                if (entity is MyCubeGrid grid && !grid.IsPreview)
                 {
                     var group = MyCubeGridGroups.Static.Physical.GetGroup(grid);
                     if (group != null && group.Nodes.FirstOrDefault()?.NodeData != grid)
