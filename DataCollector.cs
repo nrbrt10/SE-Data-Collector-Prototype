@@ -10,6 +10,7 @@ using VRage.Plugins;
 using VRage.Utils;
 using VRageMath;
 using VRage.Input;
+using VRage.Game;
 
 #nullable disable
 namespace DataCollectorTest
@@ -51,7 +52,9 @@ namespace DataCollectorTest
         public long entity_id { get; set; }
         public string grid_name { get; set; }
         public long owner_id { get; set; }
+        public bool static_grid { get; set; }
         public string faction_tag { get; set; }
+        public string iff_id { get; set; }
     }
 
     public class PositionData
@@ -71,20 +74,31 @@ namespace DataCollectorTest
         private Vector3 position { get; set; }
         private Vector3 last_position {  get; set; }
         private bool isStatic { get; set; }
+        private string iff_id { get; set; }
         public bool isPosted {  get; set; }
 
-        public MyGridInRange (MyCubeGrid grid)
+        public MyGridInRange (MyCubeGrid grid, long playerIdentityID)
         {
-            this.grid = grid;
-            this.entityId = grid.EntityId;
-            this.name = grid.DisplayName;
-            this.ownerId = grid.BigOwners?.FirstOrDefault() ?? 0L;
-            this.position = grid.PositionComp.GetPosition();
-            this.last_position = this.position;
+            try {
+                this.grid = grid;
+                this.entityId = grid.EntityId;
+                this.name = grid.DisplayName;
+                this.ownerId = grid.BigOwners?.FirstOrDefault() ?? 0L;
+                this.isStatic = grid.IsStatic;
+                this.position = grid.PositionComp.GetPosition();
+                this.last_position = this.position;
 
+                MyRelationsBetweenPlayerAndBlock iff = MyIDModule.GetRelationPlayerBlock(this.ownerId, playerIdentityID);
+                this.iff_id = iff.ToString();
 
-            IMyFaction faction = MyAPIGateway.Session.Factions.TryGetPlayerFaction(ownerId);
-            factionTag = faction.Tag ?? "Unknown";
+                IMyFaction faction = MyAPIGateway.Session.Factions.TryGetPlayerFaction(ownerId);
+                this.factionTag = faction.Tag ?? "Unknown";
+            }
+            catch (Exception ex)
+            {
+                MyAPIGateway.Utilities.ShowMessage($"{nameof(DataCollectorTest)}", $"{ex}");
+            }
+            
         }
 
         public bool HasMoved()
@@ -101,7 +115,9 @@ namespace DataCollectorTest
                 entity_id = this.entityId,
                 grid_name = this.name,
                 owner_id = this.ownerId,
-                faction_tag = this.factionTag
+                static_grid = this.isStatic,
+                faction_tag = this.factionTag,
+                iff_id = this.iff_id
             };
 
             return JsonConvert.SerializeObject(gridData);
@@ -158,7 +174,7 @@ namespace DataCollectorTest
                     if (group != null && group.Nodes.FirstOrDefault()?.NodeData != grid)
                         continue;
 
-                    MyGridInRange detectedGrid = new MyGridInRange(grid);
+                    MyGridInRange detectedGrid = new MyGridInRange(grid, player.identityId);
                     newGridsInRange.Add(detectedGrid.entityId, detectedGrid);
                 }
             }
@@ -220,6 +236,7 @@ namespace DataCollectorTest
 
     public class MyPOSTDataHandler
     {
+        private string _urlRoot = "https://navsys-backend.onrender.com";
         private MyHTTPSender _sender = new MyHTTPSender();
 
         public void SendGridData(Dictionary<long, MyGridInRange> gridsInRange)
@@ -240,7 +257,7 @@ namespace DataCollectorTest
 
             string gridPayload = $"[{string.Join(",", gridsToSend)}]";
 
-            _ = _sender.SendPostAsync("http://127.0.0.1:8000/api/v1/grids/", gridPayload);
+            _ = _sender.SendPostAsync($"{_urlRoot}/api/v1/grids/", gridPayload);
 
         }
 
@@ -260,7 +277,7 @@ namespace DataCollectorTest
 
             string positionPayload = $"[{string.Join(",", positionsToSend)}]";
 
-            _ = _sender.SendPostAsync("http://127.0.0.1:8000/api/v1/grid_positions/", positionPayload);
+            _ = _sender.SendPostAsync($"{_urlRoot}/api/v1/grid_positions/", positionPayload);
         }
     }
 
